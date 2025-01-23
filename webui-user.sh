@@ -19,13 +19,17 @@ export COMMANDLINE_ARGS="--opt-sdp-attention --theme dark --listen --port 7864 -
 #export GIT="git"
 
 # python3 venv without trailing slash (defaults to ${install_dir}/${clone_dir}/venv)
-#venv_dir="venv"
+export venv_dir="venv"
+python3 -m venv "$venv_dir" --system-site-packages
 
 # script to launch to start the app
 #export LAUNCH_SCRIPT="launch.py"
 
 # install command for torch
-#export TORCH_COMMAND="pip install torch==1.12.1+cu113 --extra-index-url https://download.pytorch.org/whl/cu113"
+#export TORCH_COMMAND="pip install torch==2.4.1 --index-url https://download.pytorch.org/whl/cu124"
+export TORCH_COMMAND="pip install torch==2.4.1 --index-url https://download.pytorch.org/whl/cu124"
+# pip install torch==2.4.1 --index-url https://download.pytorch.org/whl/cu124
+
 
 # Requirements file to use for stable-diffusion-webui
 #export REQS_FILE="requirements_versions.txt"
