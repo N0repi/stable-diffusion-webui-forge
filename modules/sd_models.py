@@ -494,7 +494,7 @@ def forge_model_reload():
         raise ValueError('You do not have any model! Please download at least one model in [models/Stable-diffusion].')
 
     state_dict = checkpoint_info.filename
-    additional_state_dicts = model_data.forge_loading_parameters.get('additional_modules', [])
+    additional_state_dicts = model_data.forge_loading_parameters.get('additional_modules', ["ae.safetensors", "clip_l.safetensors", "t5xxl_fp16.safetensors"])
 
     timer.record("cache state dict")
 

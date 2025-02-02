@@ -1,0 +1,11 @@
+Requirement already satisfied: opencv-python in /home/ai/.local/lib/python3.10/site-packages (4.7.0.68)
+Collecting opencv-python
+  Downloading opencv_python-4.11.0.86-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (63.0 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 63.0/63.0 MB 14.1 MB/s eta 0:00:00
+Requirement already satisfied: numpy>=1.17.3 in ./venv/lib/python3.10/site-packages (from opencv-python) (1.26.2)
+Installing collected packages: opencv-python
+  Attempting uninstall: opencv-python
+    Found existing installation: opencv-python 4.7.0.68
+    Not uninstalling opencv-python at /home/ai/.local/lib/python3.10/site-packages, outside environment /mnt/NAS/AI-ML/SD/SD_newer/torch1/new-install/forge/customForge/stable-diffusion-webui-forge/venv
+    Can't uninstall 'opencv-python'. No files were found to uninstall.
+Successfully installed opencv-python-4.11.0.86
