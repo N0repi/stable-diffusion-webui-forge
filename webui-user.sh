@@ -10,7 +10,7 @@
 #clone_dir="stable-diffusion-webui"
 
 # Commandline arguments for webui.py, for example: export COMMANDLINE_ARGS="--medvram --opt-split-attention"
-export COMMANDLINE_ARGS="--opt-sdp-attention --theme dark --listen --port 7864 --api --nowebui"
+export COMMANDLINE_ARGS="--opt-sdp-attention --listen --port 7864 --api --nowebui"
 
 # python3 executable
 #python_cmd="python3"
@@ -27,7 +27,7 @@ python3 -m venv "$venv_dir" --system-site-packages
 
 # install command for torch
 #export TORCH_COMMAND="pip install torch==2.4.1 --index-url https://download.pytorch.org/whl/cu124"
-export TORCH_COMMAND="pip install torch==2.4.1 --index-url https://download.pytorch.org/whl/cu124"
+export TORCH_COMMAND="pip install torch==2.4.1 torchvision==0.19.1 --index-url https://download.pytorch.org/whl/cu124"
 # pip install torch==2.4.1 --index-url https://download.pytorch.org/whl/cu124
 
 
