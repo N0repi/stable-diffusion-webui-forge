@@ -1,12 +1,13 @@
-# genJob.py
+# generate.py
 
-from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
 from typing import Dict, Optional
 import uuid
 import requests
 
-app = FastAPI()
+# Create a router instead of a standalone app
+router = APIRouter()
 
 # In-memory job status store
 job_status: Dict[str, Dict] = {}
@@ -20,7 +21,7 @@ class ImageGenRequest(BaseModel):
     api_url: str  # URL for the API endpoint (dynamic)
     denoising_strength: Optional[float] = Field(None, alias="denoisingStrength")
 
-@app.post("/generate")
+@router.post("/generate")
 def generate_image(request: ImageGenRequest, background_tasks: BackgroundTasks):
     job_id = str(uuid.uuid4())
     job_status[job_id] = {"status": "queued", "result": None, "error": None}
@@ -61,9 +62,8 @@ def process_image(request: ImageGenRequest, job_id: str):
             if not request.init_image:
                 raise ValueError("init_image is required for img2img mode")
 
-            # Added this section for img2img handling
             payload["init_image"] = request.init_image
-            payload["denoising_strength"] = request.denoising_strength or 0.75  # Fallback to 0.75 if not provided
+            payload["denoising_strength"] = request.denoising_strength or 0.75  # Fallback
             endpoint = f"{request.api_url}/sdapi/v1/img2img"
         else:
             raise ValueError("Invalid mode")
@@ -82,8 +82,7 @@ def process_image(request: ImageGenRequest, job_id: str):
         job_status[job_id]["error"] = str(e)
 
 
-
-@app.get("/generate/status/{job_id}")
+@router.get("/generate/status/{job_id}")
 def get_job_status(job_id: str):
     if job_id not in job_status:
         raise HTTPException(status_code=404, detail="Job ID not found")

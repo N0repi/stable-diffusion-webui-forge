@@ -32,6 +32,12 @@ import piexif.helper
 from contextlib import closing
 from modules.progress import create_task_id, add_task_to_queue, start_task, finish_task, current_task
 
+from generate import router as job_queue_router  # Import the router
+
+# Register the job queue routes
+# test
+app.include_router(job_queue_router, prefix="/queue")
+
 def script_name_to_index(name, scripts):
     try:
         return [script.title().lower() for script in scripts].index(name.lower())
