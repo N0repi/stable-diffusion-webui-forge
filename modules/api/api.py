@@ -32,7 +32,8 @@ import piexif.helper
 from contextlib import closing
 from modules.progress import create_task_id, add_task_to_queue, start_task, finish_task, current_task
 
-from modules.job_queue_router import router as job_queue_router
+from .job_queue_router import router as job_queue_router
+
 
 
 
