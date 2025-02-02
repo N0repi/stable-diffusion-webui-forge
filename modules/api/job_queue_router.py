@@ -83,8 +83,8 @@ def process_image(request: ImageGenRequest, job_id: str):
         elif request.mode == "img2img":
             if not request.init_image:
                 raise ValueError("init_image is required for img2img mode")
-            payload["init_image"] = request.init_image
-            payload["denoising_strength"] = request.denoising_strength or 0.75
+            payload["init_images"] = [request.init_image]  # Wrap in a list
+            payload["denoising_strength"] = request.denoising_strength or 0.85
             endpoint = f"{request.api_url}/sdapi/v1/img2img"
         else:
             raise ValueError("Invalid mode")
