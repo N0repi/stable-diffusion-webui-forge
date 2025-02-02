@@ -1,37 +1,59 @@
-# generate.py
+# job_queue_router.py
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
 from typing import Dict, Optional
 import uuid
 import requests
+from threading import Lock
 
-# Create a router instead of a standalone app
-router = APIRouter()
+# Job Queue Class
+class JobQueue:
+    def __init__(self):
+        self.job_status: Dict[str, Dict] = {}
+        self.lock = Lock()
 
-# In-memory job status store
-job_status: Dict[str, Dict] = {}
+    def create_job(self, request):
+        job_id = str(uuid.uuid4())
+        self.job_status[job_id] = {"status": "queued", "result": None, "error": None}
+        return job_id
 
-# Request body model for txt2img and img2img
+    def update_status(self, job_id, status, result=None, error=None):
+        with self.lock:
+            if job_id in self.job_status:
+                self.job_status[job_id]["status"] = status
+                self.job_status[job_id]["result"] = result
+                self.job_status[job_id]["error"] = error
+
+    def get_status(self, job_id):
+        if job_id not in self.job_status:
+            raise HTTPException(status_code=404, detail="Job ID not found")
+        return self.job_status[job_id]
+
+# Request Model
 class ImageGenRequest(BaseModel):
     prompt: str
     seed: Optional[int] = None
-    init_image: Optional[str] = None  # Only for img2img
+    init_image: Optional[str] = None
     mode: str  # "txt2img" or "img2img"
-    api_url: str  # URL for the API endpoint (dynamic)
+    api_url: str
     denoising_strength: Optional[float] = Field(None, alias="denoisingStrength")
+
+# Router Setup
+router = APIRouter()
+job_queue = JobQueue()
 
 @router.post("/generate")
 def generate_image(request: ImageGenRequest, background_tasks: BackgroundTasks):
-    job_id = str(uuid.uuid4())
-    job_status[job_id] = {"status": "queued", "result": None, "error": None}
-
-    # Background task to process the image
+    job_id = job_queue.create_job(request)
     background_tasks.add_task(process_image, request, job_id)
-
     return {"message": "Job queued", "job_id": job_id}
 
+@router.get("/generate/status/{job_id}")
+def get_job_status(job_id: str):
+    return job_queue.get_status(job_id)
 
+# Image Processing
 def process_image(request: ImageGenRequest, job_id: str):
     try:
         payload = {
@@ -61,30 +83,18 @@ def process_image(request: ImageGenRequest, job_id: str):
         elif request.mode == "img2img":
             if not request.init_image:
                 raise ValueError("init_image is required for img2img mode")
-
             payload["init_image"] = request.init_image
-            payload["denoising_strength"] = request.denoising_strength or 0.75  # Fallback
+            payload["denoising_strength"] = request.denoising_strength or 0.75
             endpoint = f"{request.api_url}/sdapi/v1/img2img"
         else:
             raise ValueError("Invalid mode")
 
         response = requests.post(endpoint, json=payload)
-
         if response.status_code == 200:
             result = response.json()
-            job_status[job_id]["status"] = "completed"
-            job_status[job_id]["result"] = result
+            job_queue.update_status(job_id, "completed", result=result)
         else:
             raise ValueError(f"Image generation failed: {response.text}")
 
     except Exception as e:
-        job_status[job_id]["status"] = "failed"
-        job_status[job_id]["error"] = str(e)
-
-
-@router.get("/generate/status/{job_id}")
-def get_job_status(job_id: str):
-    if job_id not in job_status:
-        raise HTTPException(status_code=404, detail="Job ID not found")
-
-    return job_status[job_id]
+        job_queue.update_status(job_id, "failed", error=str(e))

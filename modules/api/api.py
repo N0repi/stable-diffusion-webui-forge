@@ -34,9 +34,7 @@ from modules.progress import create_task_id, add_task_to_queue, start_task, fini
 
 from generate import router as job_queue_router  # Import the router
 
-# Register the job queue routes
-# test
-app.include_router(job_queue_router, prefix="/queue")
+
 
 def script_name_to_index(name, scripts):
     try:
@@ -213,6 +211,8 @@ class Api:
         self.app = app
         self.queue_lock = queue_lock
         #api_middleware(self.app)  # XXX this will have to be fixed
+        # Added Job Queue
+        self.app.include_router(job_queue_router, prefix="/queue")
         # Added to query LORAs
         self.add_api_route("/sdapi/v1/list-models/{wallet_address}", self.list_model_files, methods=["GET"])
         self.add_api_route("/sdapi/v1/txt2img", self.text2imgapi, methods=["POST"], response_model=models.TextToImageResponse)
