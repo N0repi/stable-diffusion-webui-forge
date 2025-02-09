@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from typing import Dict, Optional
 import uuid
 import requests
+import time
 from threading import Lock
 
 # Job Queue Class
@@ -27,7 +28,7 @@ class JobQueue:
 
     def get_status(self, job_id):
         if job_id not in self.job_status:
-            raise HTTPException(status_code=404, detail="Job ID not found")
+            return {"status": "pending", "message": "Job not started yet"}  # Avoid 404 error
         return self.job_status[job_id]
 
 # Request Model
@@ -51,7 +52,18 @@ def generate_image(request: ImageGenRequest, background_tasks: BackgroundTasks):
 
 @router.get("/generate/status/{job_id}")
 def get_job_status(job_id: str):
-    return job_queue.get_status(job_id)
+    timeout = 120  # 2-minute timeout
+    interval = 5  # Check every 5 seconds
+    start_time = time.time()
+
+    while time.time() - start_time < timeout:
+        job_status = job_queue.get_status(job_id)
+        if job_status["status"] != "pending":
+            return job_status  # Return when job is ready
+
+        time.sleep(interval)  # Wait before retrying
+
+    return {"status": "pending", "message": "Job ID not found yet. Try again later."}  # Prevents failure
 
 # Image Processing
 def process_image(request: ImageGenRequest, job_id: str):
