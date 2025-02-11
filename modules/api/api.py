@@ -7,6 +7,7 @@ import uvicorn
 import ipaddress
 import requests
 import gradio as gr
+import threading
 from threading import Lock
 from io import BytesIO
 from fastapi import APIRouter, Depends, FastAPI, Request, Response
@@ -199,6 +200,8 @@ def api_middleware(app: FastAPI):
     async def http_exception_handler(request: Request, e: HTTPException):
         return handle_exception(request, e)
 
+NEXTJS_BACKEND_URL = os.getenv("NEXTJS_BACKEND_URL", "https://www.wispi.art")
+
 
 class Api:
     def __init__(self, app: FastAPI, queue_lock: Lock):
@@ -211,6 +214,12 @@ class Api:
         self.router = APIRouter()
         self.app = app
         self.queue_lock = queue_lock
+        self.app.include_router(self.router)
+
+        # Health status of endpoint
+        @app.get("/health")
+        async def health_check():
+            return {"status": "ok"}
         #api_middleware(self.app)  # XXX this will have to be fixed
         # Added Job Queue
         self.app.include_router(job_queue_router, prefix="/queue")
@@ -392,7 +401,7 @@ class Api:
 
         def get_base_type(annotation):
             origin = get_origin(annotation)
-
+            
             if origin is Union:             # represents Optional
                 args = get_args(annotation) # filter out NoneType
                 non_none_args = [arg for arg in args if arg is not type(None)]
@@ -883,17 +892,60 @@ class Api:
                 })
         return ext_list
 
+    def notify_backend(self):
+        """Send a notification to Next.js backend when server is ready."""
+        try:
+            response = requests.post(f"{NEXTJS_BACKEND_URL}/api/server-status", json={"status": "ready"})
+            if response.status_code == 200:
+                print("✅ Successfully notified Next.js backend that the server is online.")
+            else:
+                print(f"⚠️ Failed to notify backend. Status: {response.status_code}, Response: {response.text}")
+        except Exception as e:
+            print(f"❌ Error notifying backend: {e}")
+
+    def wait_for_server(self, host, port):
+        """Wait for the server to be available before sending a request."""
+        url = f"http://{host}:{port}/health"
+        max_attempts = 30  # Max retries (~30 seconds)
+        for attempt in range(max_attempts):
+            try:
+                response = requests.get(url, timeout=2)
+                if response.status_code == 200:
+                    print(f"✅ Server is live at {url}. Notifying backend...")
+                    self.notify_backend()
+                    return
+            except requests.exceptions.ConnectionError:
+                print(f"⏳ Waiting for {url} to be available... ({attempt + 1}/{max_attempts})")
+            time.sleep(1)  # Wait 1 second before retrying
+        print("❌ Server did not respond in time.")
+
     def launch(self, server_name, port, root_path):
-        self.app.include_router(self.router)
-        uvicorn.run(
-            self.app,
-            host=server_name,
-            port=port,
-            timeout_keep_alive=shared.cmd_opts.timeout_keep_alive,
-            root_path=root_path,
-            ssl_keyfile=shared.cmd_opts.tls_keyfile,
-            ssl_certfile=shared.cmd_opts.tls_certfile
-        )
+        """Launch Uvicorn and notify backend when ready."""
+        def run_server():
+            """Run Uvicorn in a separate thread."""
+            uvicorn.run(
+                self.app,
+                host=server_name,
+                port=port,
+                timeout_keep_alive=shared.cmd_opts.timeout_keep_alive,
+                root_path=root_path,
+                ssl_keyfile=shared.cmd_opts.tls_keyfile,
+                ssl_certfile=shared.cmd_opts.tls_certfile
+            )
+
+        # Start Uvicorn in a new thread
+        server_thread = threading.Thread(target=run_server, daemon=True)
+        server_thread.start()
+
+        # Wait until the server is available, then notify the backend
+        self.wait_for_server(server_name, port)
+
+        # Keep the main thread alive (so Uvicorn does not exit)
+        server_thread.join(timeout=10)  # Prevents indefinite blocking
+
+        if not self.wait_for_server(server_name, port):
+            print("❌ Server failed to start, exiting...")
+            return  # Do not block indefinitely if server is unreachable
 
     def kill_webui(self):
         restart.stop_program()
@@ -906,3 +958,4 @@ class Api:
     def stop_webui(request):
         shared.state.server_command = "stop"
         return Response("Stopping.")
+
