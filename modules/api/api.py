@@ -895,7 +895,7 @@ class Api:
     def notify_backend(self):
         """Send a notification to Next.js backend when server is ready."""
         try:
-            response = requests.post(f"{NEXTJS_BACKEND_URL}/api/sdCalls/generate/status/server-status", json={"status": "ready"})
+            response = requests.post(f"{NEXTJS_BACKEND_URL}/api/runpod/markReady", json={"status": "ready"})
             if response.status_code == 200:
                 print("✅ Successfully notified Next.js backend that the server is online.")
             else:
