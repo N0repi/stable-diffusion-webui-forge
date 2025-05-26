@@ -52,8 +52,18 @@ def generate_image(request: ImageGenRequest, background_tasks: BackgroundTasks):
 
 @router.get("/generate/status/{job_id}")
 def get_job_status(job_id: str):
-    job_status = job_queue.get_status(job_id)
-    return job_status
+    timeout = 300  # 2-minute timeout
+    interval = 5  # Check every 5 seconds
+    start_time = time.time()
+
+    while time.time() - start_time < timeout:
+        job_status = job_queue.get_status(job_id)
+        if job_status["status"] != "pending":
+            return job_status  # Return when job is ready
+
+        time.sleep(interval)  # Wait before retrying
+
+    return {"status": "pending", "message": "Job ID not found yet. Try again later."}  # Prevents failure
 
 # Image Processing
 def process_image(request: ImageGenRequest, job_id: str):
