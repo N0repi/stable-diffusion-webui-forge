@@ -67,7 +67,12 @@ def get_job_status(job_id: str):
 
 # Image Processing
 def process_image(request: ImageGenRequest, job_id: str):
+    import time
+
     try:
+        print(f"🟢 Starting process_image for job_id={job_id}")
+        t0 = time.time()
+
         payload = {
             "prompt": request.prompt,
             "steps": 15,
@@ -95,18 +100,40 @@ def process_image(request: ImageGenRequest, job_id: str):
         elif request.mode == "img2img":
             if not request.init_image:
                 raise ValueError("init_image is required for img2img mode")
-            payload["init_images"] = [request.init_image]  # Wrap in a list
+            payload["init_images"] = [request.init_image]
             payload["denoising_strength"] = request.denoising_strength or 0.85
             endpoint = f"{request.api_url}/sdapi/v1/img2img"
         else:
             raise ValueError("Invalid mode")
 
-        response = requests.post(endpoint, json=payload)
-        if response.status_code == 200:
-            result = response.json()
-            job_queue.update_status(job_id, "completed", result=result)
-        else:
+        print(f"📤 Sending generation request to: {endpoint}")
+        post_start = time.time()
+        response = requests.post(endpoint, json=payload, timeout=90)
+        post_duration = time.time() - post_start
+        print(f"✅ POST to {endpoint} completed in {post_duration:.2f}s")
+
+        if response.status_code != 200:
+            print(f"❌ Forge returned non-200 status: {response.status_code}")
+            print(f"↩ Response text: {response.text[:300]}...")
             raise ValueError(f"Image generation failed: {response.text}")
 
+        print(f"📦 Parsing JSON response...")
+        json_start = time.time()
+        try:
+            result = response.json()
+        except Exception as json_err:
+            print(f"❌ Failed to parse JSON: {json_err}")
+            job_queue.update_status(job_id, "failed", error="Invalid JSON from backend")
+            return
+
+        json_duration = time.time() - json_start
+        print(f"✅ JSON parsed in {json_duration:.2f}s")
+
+        job_queue.update_status(job_id, "completed", result=result)
+        total = time.time() - t0
+        print(f"🏁 Job {job_id} completed successfully in {total:.2f}s")
+
     except Exception as e:
+        print(f"❌ process_image failed for job_id {job_id}: {e}")
         job_queue.update_status(job_id, "failed", error=str(e))
+
