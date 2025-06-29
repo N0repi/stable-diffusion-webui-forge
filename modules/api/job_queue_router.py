@@ -27,9 +27,13 @@ class JobQueue:
                 self.job_status[job_id]["error"] = error
 
     def get_status(self, job_id):
-        if job_id not in self.job_status:
-            return {"status": "pending", "message": "Job not started yet"}  # Avoid 404 error
-        return self.job_status[job_id]
+        try:
+            print(f"🔍 get_status called for {job_id}")
+            with self.lock:
+                return self.job_status.get(job_id, {"status": "pending"})
+        except Exception as e:
+            print(f"❌ Locking error in get_status: {e}")
+            return {"status": "error", "message": "Lock error"}
 
 # Request Model
 class ImageGenRequest(BaseModel):
@@ -54,7 +58,12 @@ def generate_image(request: ImageGenRequest):
 
 @router.get("/generate/status/{job_id}")
 def get_job_status(job_id: str):
-    return job_queue.get_status(job_id)
+    try:
+        status = job_queue.get_status(job_id)
+        return status or {"status": "pending"}
+    except Exception as e:
+        print(f"❌ Exception in get_status for {job_id}:", e)
+        return {"status": "error", "message": "Status check failed"}
 
 
 # Image Processing
