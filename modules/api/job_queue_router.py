@@ -6,7 +6,7 @@ from typing import Dict, Optional
 import uuid
 import requests
 import time
-from threading import Lock
+from threading import Lock, Thread
 
 # Job Queue Class
 class JobQueue:
@@ -45,10 +45,13 @@ router = APIRouter()
 job_queue = JobQueue()
 
 @router.post("/generate")
-def generate_image(request: ImageGenRequest, background_tasks: BackgroundTasks):
+def generate_image(request: ImageGenRequest):
     job_id = job_queue.create_job(request)
-    background_tasks.add_task(process_image, request, job_id)
+    thread = Thread(target=process_image, args=(request, job_id))
+    thread.start()
+    print(f"🧵 Job {job_id} queued and detached.")
     return {"message": "Job queued", "job_id": job_id}
+
 
 @router.get("/generate/status/{job_id}")
 def get_job_status(job_id: str):
