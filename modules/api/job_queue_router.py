@@ -52,21 +52,10 @@ def generate_image(request: ImageGenRequest):
     print(f"🧵 Job {job_id} queued and detached.")
     return {"message": "Job queued", "job_id": job_id}
 
-
 @router.get("/generate/status/{job_id}")
 def get_job_status(job_id: str):
-    timeout = 420  # 7-minute timeout
-    interval = 5  # Check every 5 seconds
-    start_time = time.time()
+    return job_queue.get_status(job_id)
 
-    while time.time() - start_time < timeout:
-        job_status = job_queue.get_status(job_id)
-        if job_status["status"] != "pending":
-            return job_status  # Return when job is ready
-
-        time.sleep(interval)  # Wait before retrying
-
-    return {"status": "pending", "message": "Job ID not found yet. Try again later."}  # Prevents failure
 
 # Image Processing
 def process_image(request: ImageGenRequest, job_id: str):
