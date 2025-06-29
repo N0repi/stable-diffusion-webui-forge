@@ -52,7 +52,7 @@ def generate_image(request: ImageGenRequest, background_tasks: BackgroundTasks):
 
 @router.get("/generate/status/{job_id}")
 def get_job_status(job_id: str):
-    timeout = 300  # 2-minute timeout
+    timeout = 420  # 7-minute timeout
     interval = 5  # Check every 5 seconds
     start_time = time.time()
 
@@ -67,7 +67,6 @@ def get_job_status(job_id: str):
 
 # Image Processing
 def process_image(request: ImageGenRequest, job_id: str):
-    import time
 
     try:
         print(f"🟢 Starting process_image for job_id={job_id}")
@@ -107,33 +106,51 @@ def process_image(request: ImageGenRequest, job_id: str):
             raise ValueError("Invalid mode")
 
         print(f"📤 Sending generation request to: {endpoint}")
-        post_start = time.time()
-        response = requests.post(endpoint, json=payload, timeout=90)
-        post_duration = time.time() - post_start
-        print(f"✅ POST to {endpoint} completed in {post_duration:.2f}s")
+        MAX_RETRIES = 3
+        RETRY_DELAY = 5
 
-        if response.status_code != 200:
-            print(f"❌ Forge returned non-200 status: {response.status_code}")
-            print(f"↩ Response text: {response.text[:300]}...")
-            raise ValueError(f"Image generation failed: {response.text}")
+        for attempt in range(MAX_RETRIES):
+            post_start = time.time()
+            try:
+                response = requests.post(endpoint, json=payload, timeout=420)
+            except Exception as post_err:
+                print(f"⚠️ Request attempt {attempt + 1} failed: {post_err}")
+                if attempt < MAX_RETRIES - 1:
+                    time.sleep(RETRY_DELAY)
+                    continue
+                else:
+                    raise
 
-        print(f"📦 Parsing JSON response...")
-        json_start = time.time()
-        try:
-            result = response.json()
-        except Exception as json_err:
-            print(f"❌ Failed to parse JSON: {json_err}")
-            job_queue.update_status(job_id, "failed", error="Invalid JSON from backend")
-            return
+            post_duration = time.time() - post_start
+            print(f"📨 Attempt {attempt + 1}: POST completed in {post_duration:.2f}s")
 
-        json_duration = time.time() - json_start
-        print(f"✅ JSON parsed in {json_duration:.2f}s")
+            if response.status_code == 200:
+                try:
+                    result = response.json()
+                    print(f"✅ JSON parsed successfully on attempt {attempt + 1}")
+                    job_queue.update_status(job_id, "completed", result=result)
+                    total = time.time() - t0
+                    print(f"🏁 Job {job_id} completed successfully in {total:.2f}s")
+                    return
+                except Exception as json_err:
+                    print(f"❌ Invalid JSON on attempt {attempt + 1}: {json_err}")
+                    if attempt < MAX_RETRIES - 1:
+                        print("🔁 Retrying due to invalid JSON...")
+                        time.sleep(RETRY_DELAY)
+                        continue
+                    else:
+                        raise ValueError("Forge returned non-JSON response.")
+            elif response.status_code == 404:
+                print(f"⚠️ Forge not ready (404) on attempt {attempt + 1}. Retrying...")
+                time.sleep(RETRY_DELAY)
+            else:
+                print(f"❌ Forge returned status {response.status_code} on attempt {attempt + 1}")
+                print(f"↩ Response text: {response.text[:300]}...")
+                raise ValueError(f"Image generation failed: {response.text}")
 
-        job_queue.update_status(job_id, "completed", result=result)
-        total = time.time() - t0
-        print(f"🏁 Job {job_id} completed successfully in {total:.2f}s")
+        # If we reach here, all attempts failed
+        raise RuntimeError("All retry attempts failed for Forge inference")
 
     except Exception as e:
         print(f"❌ process_image failed for job_id {job_id}: {e}")
         job_queue.update_status(job_id, "failed", error=str(e))
-

@@ -942,7 +942,7 @@ class Api:
         self.wait_for_server(server_name, port)
 
         # Keep the main thread alive (so Uvicorn does not exit)
-        server_thread.join(timeout=10)  # Prevents indefinite blocking
+        # server_thread.join(timeout=10)  # Prevents indefinite blocking
 
         if not self.wait_for_server(server_name, port):
             print("❌ Server failed to start, exiting...")
