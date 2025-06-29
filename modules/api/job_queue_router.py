@@ -6,13 +6,13 @@ from typing import Dict, Optional
 import uuid
 import requests
 import time
-from threading import Lock, Thread
+from threading import RLock
 
 # Job Queue Class
 class JobQueue:
     def __init__(self):
         self.job_status: Dict[str, Dict] = {}
-        self.lock = Lock()
+        self.lock = RLock()
 
     def create_job(self, request):
         job_id = str(uuid.uuid4())
@@ -27,13 +27,7 @@ class JobQueue:
                 self.job_status[job_id]["error"] = error
 
     def get_status(self, job_id):
-        try:
-            print(f"🔍 get_status called for {job_id}")
-            with self.lock:
-                return self.job_status.get(job_id, {"status": "pending"})
-        except Exception as e:
-            print(f"❌ Locking error in get_status: {e}")
-            return {"status": "error", "message": "Lock error"}
+        return self.job_status.get(job_id, {"status": "pending", "message": "Job not started yet"})
 
 # Request Model
 class ImageGenRequest(BaseModel):
@@ -48,27 +42,21 @@ class ImageGenRequest(BaseModel):
 router = APIRouter()
 job_queue = JobQueue()
 
+# ✅ Launch background image processing
 @router.post("/generate")
-def generate_image(request: ImageGenRequest):
+def generate_image(request: ImageGenRequest, background_tasks: BackgroundTasks):
     job_id = job_queue.create_job(request)
-    thread = Thread(target=process_image, args=(request, job_id))
-    thread.start()
-    print(f"🧵 Job {job_id} queued and detached.")
+    background_tasks.add_task(process_image, request, job_id)
+    print(f"🧵 Job {job_id} queued and detached via BackgroundTasks")
     return {"message": "Job queued", "job_id": job_id}
 
+# ✅ Poll job status
 @router.get("/generate/status/{job_id}")
 def get_job_status(job_id: str):
-    try:
-        status = job_queue.get_status(job_id)
-        return status or {"status": "pending"}
-    except Exception as e:
-        print(f"❌ Exception in get_status for {job_id}:", e)
-        return {"status": "error", "message": "Status check failed"}
+    return job_queue.get_status(job_id)
 
-
-# Image Processing
+# 🔧 Background processing logic
 def process_image(request: ImageGenRequest, job_id: str):
-
     try:
         print(f"🟢 Starting process_image for job_id={job_id}")
         t0 = time.time()
@@ -107,51 +95,16 @@ def process_image(request: ImageGenRequest, job_id: str):
             raise ValueError("Invalid mode")
 
         print(f"📤 Sending generation request to: {endpoint}")
-        MAX_RETRIES = 3
-        RETRY_DELAY = 5
+        response = requests.post(endpoint, json=payload, timeout=420)
 
-        for attempt in range(MAX_RETRIES):
-            post_start = time.time()
-            try:
-                response = requests.post(endpoint, json=payload, timeout=420)
-            except Exception as post_err:
-                print(f"⚠️ Request attempt {attempt + 1} failed: {post_err}")
-                if attempt < MAX_RETRIES - 1:
-                    time.sleep(RETRY_DELAY)
-                    continue
-                else:
-                    raise
-
-            post_duration = time.time() - post_start
-            print(f"📨 Attempt {attempt + 1}: POST completed in {post_duration:.2f}s")
-
-            if response.status_code == 200:
-                try:
-                    result = response.json()
-                    print(f"✅ JSON parsed successfully on attempt {attempt + 1}")
-                    job_queue.update_status(job_id, "completed", result=result)
-                    total = time.time() - t0
-                    print(f"🏁 Job {job_id} completed successfully in {total:.2f}s")
-                    return
-                except Exception as json_err:
-                    print(f"❌ Invalid JSON on attempt {attempt + 1}: {json_err}")
-                    if attempt < MAX_RETRIES - 1:
-                        print("🔁 Retrying due to invalid JSON...")
-                        time.sleep(RETRY_DELAY)
-                        continue
-                    else:
-                        raise ValueError("Forge returned non-JSON response.")
-            elif response.status_code == 404:
-                print(f"⚠️ Forge not ready (404) on attempt {attempt + 1}. Retrying...")
-                time.sleep(RETRY_DELAY)
-            else:
-                print(f"❌ Forge returned status {response.status_code} on attempt {attempt + 1}")
-                print(f"↩ Response text: {response.text[:300]}...")
-                raise ValueError(f"Image generation failed: {response.text}")
-
-        # If we reach here, all attempts failed
-        raise RuntimeError("All retry attempts failed for Forge inference")
+        if response.status_code == 200:
+            result = response.json()
+            job_queue.update_status(job_id, "completed", result=result)
+            print(f"✅ Job {job_id} completed in {time.time() - t0:.2f}s")
+        else:
+            raise ValueError(f"Forge returned {response.status_code}: {response.text[:300]}")
 
     except Exception as e:
-        print(f"❌ process_image failed for job_id {job_id}: {e}")
+        print(f"❌ Job {job_id} failed: {e}")
         job_queue.update_status(job_id, "failed", error=str(e))
+
