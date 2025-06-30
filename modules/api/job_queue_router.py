@@ -26,11 +26,11 @@ class JobQueue:
                 self.job_status[job_id]["result"] = result
                 self.job_status[job_id]["error"] = error
 
-def get_status(self, job_id):
-    with self.lock:
-        if job_id in self.job_status:
-            return self.job_status[job_id]
-    raise HTTPException(status_code=404, detail="Job not found")
+    def get_status(self, job_id):
+        with self.lock:
+            if job_id in self.job_status:
+                return self.job_status[job_id]
+        raise HTTPException(status_code=404, detail="Job not found")
 
 # Request Model
 class ImageGenRequest(BaseModel):
@@ -48,8 +48,6 @@ job_queue = JobQueue()
 @router.get("/")
 def root():
     return {"message": "Online"}
-
-
 
 # ✅ Launch background image processing
 @router.post("/generate")
