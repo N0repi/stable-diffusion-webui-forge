@@ -17,11 +17,10 @@ class RedisJobQueue:
         if not self.redis_url or not self.redis_token:
             raise ValueError("Missing Redis environment variables")
         
-        # Initialize Redis connection
+        # Initialize Redis connection (matching existing redis-subscriber pattern)
         self.redis = redis.from_url(
             self.redis_url,
             password=self.redis_token,
-            ssl=True,
             decode_responses=True
         )
         
