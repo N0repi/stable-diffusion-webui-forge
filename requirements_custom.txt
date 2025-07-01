@@ -248,4 +248,4 @@ yacs==0.1.8
 yarl==1.18.3
 zipp @ file:///home/conda/feedstock_root/build_artifacts/zipp_1724730934107/work
 zstandard==0.23.0
-redis=5.0.1
+redis==5.0.1
