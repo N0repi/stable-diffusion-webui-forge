@@ -18,11 +18,7 @@ class RedisJobQueue:
             raise ValueError("Missing Redis environment variables")
         
         # Initialize Redis connection (matching existing redis-subscriber pattern)
-        self.redis = redis.from_url(
-            self.redis_url,
-            password=self.redis_token,
-            decode_responses=True
-        )
+        self.redis = redis.from_url(self.redis_url, decode_responses=True)
         
         # Queue and job keys
         self.job_queue_key = "forge:job_queue"
