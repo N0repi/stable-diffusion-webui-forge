@@ -40,7 +40,7 @@ async def generate_image(request: ImageGenRequest, background_tasks: BackgroundT
         "api_url": request.api_url,
         "denoising_strength": request.denoising_strength
     }
-    
+
     job_id = await job_queue.create_job(request_data)
     print(f"🧵 Job {job_id} queued in Redis")
     return {"message": "Job queued", "job_id": job_id}
@@ -53,5 +53,4 @@ async def get_job_status(job_id: str):
 # 🔧 Background processing is now handled by Redis worker
 # The worker runs separately and processes jobs from the Redis queue
 # See redis_worker.py for the processing logic
-
 
