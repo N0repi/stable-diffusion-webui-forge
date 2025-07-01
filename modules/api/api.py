@@ -401,7 +401,7 @@ class Api:
 
         def get_base_type(annotation):
             origin = get_origin(annotation)
-
+            
             if origin is Union:             # represents Optional
                 args = get_args(annotation) # filter out NoneType
                 non_none_args = [arg for arg in args if arg is not type(None)]
@@ -959,3 +959,4 @@ class Api:
     def stop_webui(request):
         shared.state.server_command = "stop"
         return Response("Stopping.")
+
