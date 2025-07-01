@@ -7,19 +7,22 @@ import uuid
 import requests
 import os
 from typing import Dict, Any, Optional
-import redis.asyncio as redis
+from upstash_redis.asyncio import Redis
 
 class RedisJobWorker:
     def __init__(self):
-        # Use the same Redis connection pattern as the existing redis-subscriber
-        self.redis_url = os.getenv("UPSTASH_REDIS_REDIS_URL")
+        # Use Upstash REST client instead of Redis protocol
+        self.redis_url = os.getenv("UPSTASH_REDIS_REST_URL")
         self.redis_token = os.getenv("UPSTASH_REDIS_REDIS_TOKEN")
         
-        if not self.redis_url or not self.redis_token:
-            raise ValueError("Missing Redis environment variables")
+        if not self.redis_url:
+            raise ValueError("Missing UPSTASH_REDIS_REST_URL environment variable")
         
-        # Initialize Redis connection (matching existing redis-subscriber pattern)
-        self.redis = redis.from_url(self.redis_url, decode_responses=True)
+        # Initialize Upstash Redis REST client
+        if self.redis_token:
+            self.redis = Redis(url=self.redis_url, token=self.redis_token)
+        else:
+            self.redis = Redis(url=self.redis_url)
         
         # Queue and job keys (same as RedisJobQueue)
         self.job_queue_key = "forge:job_queue"
@@ -54,17 +57,15 @@ class RedisJobWorker:
     async def stop(self):
         """Stop the worker"""
         self.running = False
-        await self.redis.close()
+        # Upstash REST client doesn't need explicit closing
         
     async def get_next_job(self) -> Optional[Dict[str, Any]]:
         """Get the next job from the queue (FIFO)"""
-        # Pop job from queue (blocking for 1 second)
-        result = await self.redis.brpop(self.job_queue_key, timeout=1)
-        if not result:
+        # Pop job from queue (non-blocking)
+        job_id = await self.redis.rpop(self.job_queue_key)
+        if not job_id:
             return None
             
-        job_id = result[1]
-        
         # Get job data
         job_data_str = await self.redis.get(f"{self.job_status_prefix}{job_id}")
         if not job_data_str:
