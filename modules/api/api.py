@@ -200,10 +200,7 @@ def api_middleware(app: FastAPI):
     async def http_exception_handler(request: Request, e: HTTPException):
         return handle_exception(request, e)
 
-# Determine environment and set appropriate backend URL
-IS_DEVELOPMENT = os.getenv("NODE_ENV") != "production" and os.getenv("ENVIRONMENT") != "production"
-DEFAULT_URL = "http://localhost:3000" if IS_DEVELOPMENT else "https://www.wispi.art"
-NEXTJS_BACKEND_URL = os.getenv("NEXTJS_BACKEND_URL", DEFAULT_URL)
+NEXTJS_BACKEND_URL = os.getenv("NEXTJS_BACKEND_URL", "https://13fa91d88496.ngrok-free.app/")
 
 
 class Api:
@@ -897,31 +894,15 @@ class Api:
 
     def notify_backend(self):
         """Send a notification to Next.js backend when server is ready."""
-        # List of backend URLs to try (development first, then production)
-        backend_urls = [
-            os.getenv("NEXTJS_BACKEND_URL", NEXTJS_BACKEND_URL),
-            "http://localhost:3000",
-            "https://www.wispi.art"
-        ]
-
-        # Remove duplicates while preserving order
-        backend_urls = list(dict.fromkeys(backend_urls))
-
-        subscription_id = os.environ.get("SUBSCRIPTION_ID")
-        payload = {"subscription_id": subscription_id, "status": "ready", "runtime": "forge-container-runtime"}
-
-        for url in backend_urls:
-            try:
-                response = requests.post(f"{url}/api/runpod/markReady", json=payload, timeout=5)
-                if response.status_code == 200:
-                    print(f"✅ Successfully notified Next.js backend at {url}")
-                    return
-                else:
-                    print(f"⚠️ Failed to notify backend at {url}. Status: {response.status_code}")
-            except Exception as e:
-                print(f"❌ Error notifying backend at {url}: {e}")
-
-        print("❌ Failed to notify any backend URL")
+        try:
+            subscription_id = os.environ.get("SUBSCRIPTION_ID")
+            response = requests.post(f"{NEXTJS_BACKEND_URL}/api/runpod/markReady", json={"subscription_id": subscription_id, "status": "ready", "runtime": "forge-container-runtime"})
+            if response.status_code == 200:
+                print("✅ Successfully notified Next.js backend that the server is online.")
+            else:
+                print(f"⚠️ Failed to notify backend. Status: {response.status_code}, Response: {response.text}")
+        except Exception as e:
+            print(f"❌ Error notifying backend: {e}")
 
     def wait_for_server(self, host, port):
         """Wait for the server to be available before sending a request."""
