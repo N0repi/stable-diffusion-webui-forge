@@ -16,10 +16,19 @@ from .redis_job_queue import job_queue
 class ImageGenRequest(BaseModel):
     prompt: str
     seed: Optional[int] = None
-    init_image: Optional[str] = None
-    mode: str  # "txt2img" or "img2img"
+    mode: str = "txt2img"  # txt2img, img2img, or inpaint
+    init_image: Optional[str] = None  # Base64 encoded image for img2img/inpaint
+    mask: Optional[str] = None  # Base64 encoded mask for inpaint
+    denoising_strength: Optional[float] = 0.85
+    # Inpainting parameters
+    mask_blur: Optional[int] = None
+    mask_blur_x: Optional[int] = None
+    mask_blur_y: Optional[int] = None
+    inpainting_fill: Optional[int] = None
+    inpaint_full_res: Optional[bool] = None
+    inpaint_full_res_padding: Optional[int] = None
+    inpainting_mask_invert: Optional[int] = None
     api_url: str
-    denoising_strength: Optional[float] = Field(None, alias="denoisingStrength")
 
 # Router Setup
 router = APIRouter()
@@ -53,4 +62,3 @@ async def get_job_status(job_id: str):
 # 🔧 Background processing is now handled by Redis worker
 # The worker runs separately and processes jobs from the Redis queue
 # See redis_worker.py for the processing logic
-
