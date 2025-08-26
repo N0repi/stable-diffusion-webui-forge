@@ -19,7 +19,7 @@ class ImageGenRequest(BaseModel):
     mode: str = "txt2img"  # txt2img, img2img, or inpaint
     init_image: Optional[str] = None  # Base64 encoded image for img2img/inpaint
     mask: Optional[str] = None  # Base64 encoded mask for inpaint
-    denoising_strength: Optional[float] = 0.85
+    denoising_strength: Optional[float] = None
     # Inpainting parameters
     mask_blur: Optional[int] = None
     mask_blur_x: Optional[int] = None
@@ -41,14 +41,8 @@ def root():
 @router.post("/generate")
 async def generate_image(request: ImageGenRequest, background_tasks: BackgroundTasks):
     # Convert request to dict for Redis storage
-    request_data = {
-        "prompt": request.prompt,
-        "seed": request.seed,
-        "init_image": request.init_image,
-        "mode": request.mode,
-        "api_url": request.api_url,
-        "denoising_strength": request.denoising_strength
-    }
+    # Convert request to dict for Redis storage (includes all fields)
+    request_data = request.dict()
 
     job_id = await job_queue.create_job(request_data)
     print(f"🧵 Job {job_id} queued in Redis")
