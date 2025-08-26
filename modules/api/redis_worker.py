@@ -164,6 +164,11 @@ class RedisJobWorker:
                 endpoint = f"{request['api_url']}/sdapi/v1/img2img"
             # ─────────── inpaint ───────────
             elif request["mode"] == "inpaint":
+                # Add debugging BEFORE validation
+                print(f"🔍 Worker received request keys: {list(request.keys())}")
+                print(f"🔍 Worker request.get('mask'): {bool(request.get('mask'))}")
+                print(f"🔍 Worker request.get('init_image'): {bool(request.get('init_image'))}")
+
                 if not request.get("init_image"):
                     raise ValueError("init_image is required for inpaint mode")
                 if not request.get("mask"):
